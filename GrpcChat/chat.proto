@@ -1,0 +1,35 @@
+﻿syntax = "proto3";
+
+message Color {
+	int32 red = 1;
+	int32 blue = 2;
+	int32 green = 3;
+}
+
+message Font {
+	string name = 1;
+	int32 style = 2;
+	float size = 3;
+	Color color = 4;
+}
+
+message ChatMessage {
+	string name = 1;
+	Font font = 2;
+	string message = 3;
+}
+
+message ServerChatMessage {
+	ChatMessage message = 1;
+	Status status = 2;
+}
+
+message Status {
+	string addClient = 1;
+	string deleteClient = 2;
+	repeated string currentClients = 3;
+}
+
+service ChatService {
+	rpc ChatStream(stream ChatMessage) returns (stream ServerChatMessage);
+}
