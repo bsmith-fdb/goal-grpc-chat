@@ -25,10 +25,11 @@ namespace GrpcChatServer
             public IAsyncStreamWriter<ServerChatMessage> ChatWriter { get; set; }
             public ServerCallContext ChatContext { get; set; }
             public string Username { get; set; }
+            public Guid Guid { get; set; }
         }
 
-        private List<ConnectedClient> clients = new List<ConnectedClient>();
-        SemaphoreSlim mutex = new SemaphoreSlim(1);
+        private readonly List<ConnectedClient> clients = new List<ConnectedClient>();
+        private readonly SemaphoreSlim mutex = new SemaphoreSlim(1);
 
         private async Task Broadcast(ChatMessage cm)
         {
@@ -42,19 +43,45 @@ namespace GrpcChatServer
 
         private async Task Broadcast(ServerChatMessage sm)
         {
-            Console.WriteLine($"ThreadID={System.Threading.Thread.CurrentThread.ManagedThreadId} Broadcast");
-            foreach (var client in clients)
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+
+            var taskList = clients.Select(c => 
+                Task.Run(async () => {
+                    try
+                    {
+                        await c.ChatWriter.WriteAsync(sm);
+                    }
+                    catch (Exception ex)
+                    {
+                        ex.Data.Add("Username", c.Username);
+                        throw;
+                    }
+            }));
+
+            var tasks = Task.WhenAll(taskList);
+
+            try
             {
-                await client.ChatWriter.WriteAsync(sm);
+                await tasks;
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Caught exception in Broadcast: {ex.Message}");
+            }
+            
+            tasks.Exception?.Handle(ex => { 
+                Console.WriteLine($"Caught exception in Brodcast: Username='{ex.Data["Username"]}' -- {ex.Message}"); 
+                return true; 
+            });
+
+            Console.WriteLine($"ThreadID={System.Threading.Thread.CurrentThread.ManagedThreadId} Broadcast {sw.Elapsed:G}");
         }
 
         private async Task AddClient(ConnectedClient client)
         {
-            await mutex.WaitAsync().ConfigureAwait(false);
-
             try
             {
+                await mutex.WaitAsync();
                 Console.WriteLine($"ThreadID={System.Threading.Thread.CurrentThread.ManagedThreadId} AddClient");
                 clients.Add(client);
                 var st = new Status();
@@ -62,7 +89,6 @@ namespace GrpcChatServer
                 st.CurrentClients.Add(clients.Select(x => x.Username));
                 var sm = new ServerChatMessage();
                 sm.Status = st;
-
                 await Broadcast(sm);
             }
             finally
@@ -73,10 +99,9 @@ namespace GrpcChatServer
 
         private async Task DeleteClient(ConnectedClient client)
         {
-            await mutex.WaitAsync().ConfigureAwait(false);
-
             try
             {
+                await mutex.WaitAsync();
                 Console.WriteLine($"ThreadID={System.Threading.Thread.CurrentThread.ManagedThreadId} DeleteClient");
                 clients.Remove(client);
                 var st = new Status();
@@ -95,6 +120,10 @@ namespace GrpcChatServer
 
         public override async Task ChatStream(IAsyncStreamReader<ChatMessage> requestStream, IServerStreamWriter<ServerChatMessage> responseStream, ServerCallContext context)
         {
+            var responseHeaders = new Metadata();
+            responseHeaders.Add("status", "OK");
+            await context.WriteResponseHeadersAsync(responseHeaders);
+            
             string username = context.RequestHeaders.GetValue("username");
             ClientConnected.Invoke(username);
 
@@ -103,17 +132,17 @@ namespace GrpcChatServer
                 ChatReader = requestStream,
                 ChatWriter = responseStream,
                 ChatContext = context,
-                Username = username
+                Username = username,
+                Guid = new Guid()
             };
 
             await AddClient(client);
 
             while (await requestStream.MoveNext())
             {
-                await mutex.WaitAsync().ConfigureAwait(false);
-
                 try
                 {
+                    await mutex.WaitAsync();
                     ChatMessageReceived.Invoke(requestStream.Current);
                     await Broadcast(requestStream.Current);
                 }
