@@ -20,7 +20,7 @@ namespace GrpcChatClient
         private AsyncDuplexStreamingCall<ChatMessage, ServerChatMessage> call;
         private delegate void SafeCallDelegate(object obj);
 
-        private readonly List<string> Usernames = new List<string> { "Rusty Knuckles", "Big Dave", "Crazy Bob", "Ghost Wolf" };
+        private readonly List<string> Usernames = new List<string> { "Rusty Knuckles", "Big Dave", "Crazy Bob", "Ghost Wolf", "Seamus", "Astrid" };
 
         public MainForm()
         {
@@ -177,7 +177,7 @@ namespace GrpcChatClient
 
         private void Form1_Load(object sender, EventArgs e)
         {
-            txtName.Text = $"{Usernames[new Random().Next(0, Usernames.Count - 1)]}-{Guid.NewGuid()}";
+            txtUsername.Text = $"{Usernames[new Random().Next(0, Usernames.Count - 1)]}";
             //Connect(txtName.Text);
             //for (int i = 0; i < 50; i++)
             //{
@@ -213,7 +213,7 @@ namespace GrpcChatClient
         {
             return new ChatMessage
             {
-                Name = txtName.Text,
+                Name = txtUsername.Text,
                 Font = new Font
                 {
                     Name = fontDialog1.Font.Name,
@@ -244,13 +244,27 @@ namespace GrpcChatClient
         {
             try
             {
-                string username = txtName.Text;
-                if (string.IsNullOrWhiteSpace(username))
+                if (string.IsNullOrEmpty(txtHost.Text))
                 {
-                    throw new Exception("You must enter a username");
+                    throw new Exception("Host is required");
                 }
 
-                await Connect(username);
+                if (string.IsNullOrEmpty(txtPort.Text))
+                {
+                    throw new Exception("Port is required");
+                }
+
+                if (!int.TryParse(txtPort.Text, out int port))
+                {
+                    throw new Exception("Port must be an integer");
+                }
+
+                if (string.IsNullOrWhiteSpace(txtUsername.Text))
+                {
+                    throw new Exception("Username is required");
+                }
+
+                await Connect(txtUsername.Text, txtHost.Text, port);
             }
             catch (Exception ex)
             {

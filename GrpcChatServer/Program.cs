@@ -9,7 +9,7 @@ namespace GrpcChatServer
         static void Main(string[] args)
         {
             const int port = 1337;
-            const string host = "localhost";
+            const string host = "0.0.0.0";
 
             var svc = new ChatServiceImpl();
             svc.ClientConnected += Svc_ClientConnected;
@@ -25,8 +25,9 @@ namespace GrpcChatServer
 
             Console.WriteLine($"Started server on {host}:{port}");
 
-            Console.WriteLine("Press [Esc] to exit");
-            while (Console.ReadKey().Key != ConsoleKey.Escape)
+            Console.WriteLine("Press [Enter] to exit");
+
+            while (Console.Read() != (int)ConsoleKey.Enter)
             {
                 continue;
             }
