@@ -189,7 +189,6 @@
             this.txtHost.Name = "txtHost";
             this.txtHost.Size = new System.Drawing.Size(153, 23);
             this.txtHost.TabIndex = 13;
-            this.txtHost.Text = "localhost";
             // 
             // txtPort
             // 
@@ -197,7 +196,6 @@
             this.txtPort.Name = "txtPort";
             this.txtPort.Size = new System.Drawing.Size(153, 23);
             this.txtPort.TabIndex = 14;
-            this.txtPort.Text = "1337";
             // 
             // MainForm
             // 

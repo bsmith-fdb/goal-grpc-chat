@@ -20,7 +20,7 @@ namespace GrpcChatClient
         private AsyncDuplexStreamingCall<ChatMessage, ServerChatMessage> call;
         private delegate void SafeCallDelegate(object obj);
 
-        private readonly List<string> Usernames = new List<string> { "Rusty Knuckles", "Big Dave", "Crazy Bob", "Ghost Wolf", "Seamus", "Astrid", "Null Blob" };
+        private readonly List<string> Usernames = new List<string> { "Rusty Knuckles", "Big Dave", "Crazy Bob", "Ghost Wolf", "Seamus", "Astrid", "Null Blob", "a dog named Baron" };
 
         public MainForm()
         {
@@ -186,7 +186,10 @@ namespace GrpcChatClient
 
         private void Form1_Load(object sender, EventArgs e)
         {
+            txtHost.Text = "bhschatserver.eastus.azurecontainer.io";
+            txtPort.Text = "1337";
             txtUsername.Text = $"{Usernames[new Random().Next(0, Usernames.Count - 1)]}";
+
             //Connect(txtUsername.Text);
             //SendSpam();
         }
