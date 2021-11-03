@@ -18,11 +18,6 @@ jobs:
       uses: actions/setup-dotnet@v1
       with:
         dotnet-version: 5.0.x
-    - name: Build GrpcChatServer project
-      run: dotnet build GrpcChatServer/GrpcChatServer.csproj
     - name: Build the Docker image
       run: docker build . --file Dockerfile --tag grpc-chat-server
-    - name: Upload build artifact
-      uses: actions/upload-artifact@v2.2.4
-      with:
-        path: grpc-chat-server
+
