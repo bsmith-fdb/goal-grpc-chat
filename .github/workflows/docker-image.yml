@@ -20,4 +20,3 @@ jobs:
         dotnet-version: 5.0.x
     - name: Build the Docker image
       run: docker build . --file Dockerfile --tag grpc-chat-server
-
