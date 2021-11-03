@@ -19,7 +19,7 @@ jobs:
 
     env:
       Solution_Name: GrpcChat.sln
-      Build_Output_Path: \GrpcChatClient\bin\Release\net5.0-windows
+      Build_Output_Path: GrpcChatClient\bin\Release\net5.0-windows\*.*
 
     steps:
     - name: Checkout
