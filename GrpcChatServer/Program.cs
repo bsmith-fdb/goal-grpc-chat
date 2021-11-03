@@ -20,8 +20,10 @@ namespace GrpcChatServer
             };
             svr.Start();
 
-            if (Console.ReadLine() == string.Empty)
-            { }
+            while (Console.ReadLine() != "quit")
+            {
+                continue;
+            }
         }
     }
 }

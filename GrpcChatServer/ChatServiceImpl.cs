@@ -201,7 +201,6 @@ namespace GrpcChatServer
                 while (await requestStream.MoveNext())
                 {
                     await Broadcast(requestStream.Current);
-                    throw new Exception("Test exception");
                 }
             }
             catch (Exception ex)
