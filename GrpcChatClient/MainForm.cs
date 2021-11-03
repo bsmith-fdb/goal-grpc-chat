@@ -20,7 +20,7 @@ namespace GrpcChatClient
         private AsyncDuplexStreamingCall<ChatMessage, ServerChatMessage> call;
         private delegate void SafeCallDelegate(object obj);
 
-        private readonly List<string> Usernames = new List<string> { "Rusty Knuckles", "Big Dave", "Crazy Bob", "Ghost Wolf", "Seamus", "Astrid" };
+        private readonly List<string> Usernames = new List<string> { "Rusty Knuckles", "Big Dave", "Crazy Bob", "Ghost Wolf", "Seamus", "Astrid", "Null Blob" };
 
         public MainForm()
         {
@@ -104,7 +104,7 @@ namespace GrpcChatClient
             txtChat.ScrollToCaret();
         }
 
-        private async Task Connect(string username, string host = "localhost", int port = 1337)
+        private void Connect(string username, string host = "localhost", int port = 1337)
         {
             Debug.Print($"Client Connect: Username='{username}' Host='{host}' Port='{port}'");
 
@@ -116,9 +116,8 @@ namespace GrpcChatClient
 
             try
             {
-                btnConnect.Enabled = false;
                 call = client.ChatStream(headers);
-                var responseHeaders = await call.ResponseHeadersAsync;
+                var responseHeaders = call.ResponseHeadersAsync.Result;
 
                 if (responseHeaders.GetValue("status") != "OK")
                 {
@@ -126,45 +125,55 @@ namespace GrpcChatClient
                 }
 
                 toolStripStatusLabel1.Text = "Connected";
+                btnConnect.Enabled = false;
                 btnDisconnect.Enabled = true;
-                await ProcessResponseStream();
+
+                Task.Run(async () => await ProcessResponseStream()).ContinueWith(t =>
+                {
+                    if (t.Exception != null)
+                    {
+                        MessageBox.Show(t.Exception.Message, t.Exception.GetType().ToString(), MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+
+                    Disconnect();
+                }, TaskScheduler.FromCurrentSynchronizationContext());
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message, ex.GetType().ToString());
-            }
-            finally
-            {
-                await Disconnect();
+                MessageBox.Show(ex.Message, ex.GetType().ToString(), MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        private async Task Disconnect()
+        private void Disconnect()
         {
-            Debug.Print("Client Disconnect");
-            try
+            if (btnDisconnect.Enabled)
             {
-                await call.RequestStream.CompleteAsync();
-            }
-            catch (Exception ex)
-            {
-                Debug.Print($"Client Disconnect: {ex.Message}");
-            }
+                Debug.Print("Client Disconnect");
 
-            try
-            {
-                await channel.ShutdownAsync();
-            }
-            catch (Exception ex)
-            {
-                Debug.Print($"Client Disconnect: {ex.Message}");
-            }
+                try
+                {
+                    call.RequestStream.CompleteAsync().Wait(5000);
+                }
+                catch (Exception ex)
+                {
+                    Debug.Print($"Client Disconnect: {ex.Message}");
+                }
 
-            toolStripStatusLabel1.Text = "Disconnected";
-            lstClients.Items.Clear();
-            txtChat.Clear();
-            btnConnect.Enabled = true;
-            btnDisconnect.Enabled = false;
+                try
+                {
+                    channel.ShutdownAsync().Wait(5000);
+                }
+                catch (Exception ex)
+                {
+                    Debug.Print($"Client Disconnect: {ex.Message}");
+                }
+
+                toolStripStatusLabel1.Text = "Disconnected";
+                lstClients.Items.Clear();
+                txtChat.Clear();
+                btnConnect.Enabled = true;
+                btnDisconnect.Enabled = false;
+            }
         }
 
         private async Task ProcessResponseStream()
@@ -178,18 +187,32 @@ namespace GrpcChatClient
         private void Form1_Load(object sender, EventArgs e)
         {
             txtUsername.Text = $"{Usernames[new Random().Next(0, Usernames.Count - 1)]}";
-            //Connect(txtName.Text);
-            //for (int i = 0; i < 50; i++)
-            //{
-            //    txtMessage.Text = DateTime.Now.Ticks.ToString();
-            //    txtMessage_KeyDown(txtMessage, new KeyEventArgs(Keys.Enter));
-            //    //System.Threading.Thread.Sleep(1000);
-            //}
+            //Connect(txtUsername.Text);
+            //SendSpam();
         }
 
-        private async void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        private void SendSpam()
         {
-            await Disconnect();
+            var args = new KeyEventArgs(Keys.Enter);
+
+            for (int i = 0; i < 50; i++)
+            {
+                txtMessage.Text = DateTime.Now.Ticks.ToString();
+
+                args.Handled = false;
+
+                txtMessage_KeyDown(txtMessage, args);
+
+                if (!args.Handled)
+                {
+                    break;
+                }
+            }
+        }
+
+        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            Disconnect();
         }
 
         private void txtMessage_KeyDown(object sender, KeyEventArgs e)
@@ -201,6 +224,8 @@ namespace GrpcChatClient
                     var msg = BuildChatMessage();
                     call.RequestStream.WriteAsync(msg).Wait();
                     txtMessage.Clear();
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
                 }
                 catch (Exception ex)
                 {
@@ -240,7 +265,7 @@ namespace GrpcChatClient
             fontDialog1.ShowDialog(this);
         }
 
-        private async void btnConnect_Click(object sender, EventArgs e)
+        private void btnConnect_Click(object sender, EventArgs e)
         {
             try
             {
@@ -264,7 +289,7 @@ namespace GrpcChatClient
                     throw new Exception("Username is required");
                 }
 
-                await Connect(txtUsername.Text, txtHost.Text, port);
+                Connect(txtUsername.Text, txtHost.Text, port);
             }
             catch (Exception ex)
             {
@@ -272,11 +297,11 @@ namespace GrpcChatClient
             }
         }
 
-        private async void btnDisconnect_Click(object sender, EventArgs e)
+        private void btnDisconnect_Click(object sender, EventArgs e)
         {
             try
             {
-                await Disconnect();
+                Disconnect();
             }
             catch (Exception ex)
             {

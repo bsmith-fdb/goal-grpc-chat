@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -10,15 +9,6 @@ namespace GrpcChatServer
 {
     public class ChatServiceImpl : ChatService.ChatServiceBase
     {
-        public delegate void ClientConnectedEventHandler(string username);
-        public event ClientConnectedEventHandler ClientConnected;
-
-        public delegate void ClientDisconnectedEventHandler(string username);
-        public event ClientDisconnectedEventHandler ClientDisconnected;
-
-        public delegate void ChatMessageReceivedEventHandler(ChatMessage cm);
-        public event ChatMessageReceivedEventHandler ChatMessageReceived;
-
         public class ConnectedClient
         {
             public IAsyncStreamReader<ChatMessage> ChatReader { get; set; }
@@ -28,7 +18,7 @@ namespace GrpcChatServer
             public Guid Guid { get; set; }
         }
 
-        private readonly List<ConnectedClient> clients = new List<ConnectedClient>();
+        private readonly HashSet<ConnectedClient> clients = new HashSet<ConnectedClient>();
         private readonly SemaphoreSlim mutex = new SemaphoreSlim(1);
 
         private async Task Broadcast(ChatMessage cm)
@@ -43,89 +33,132 @@ namespace GrpcChatServer
 
         private async Task Broadcast(ServerChatMessage sm)
         {
+            await mutex.WaitAsync();
+
             var sw = System.Diagnostics.Stopwatch.StartNew();
-
-            var taskList = clients.Select(c => 
-                Task.Run(async () => {
-                    try
-                    {
-                        await c.ChatWriter.WriteAsync(sm);
-                    }
-                    catch (Exception ex)
-                    {
-                        ex.Data.Add("Username", c.Username);
-                        throw;
-                    }
-            }));
-
-            var tasks = Task.WhenAll(taskList);
 
             try
             {
+                var taskList = clients.Select(c =>
+                    Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await c.ChatWriter.WriteAsync(sm);
+                        }
+                        catch (Exception ex)
+                        {
+                            ex.Data.Add("ClientObject", c);
+                            ex.Data.Add("Username", c?.Username);
+                            ex.Data.Add("Guid", c?.Guid);
+                            throw;
+                        }
+                    }));
+
+                var tasks = Task.WhenAll(taskList);
+
                 await tasks;
+
+                tasks.Exception?.Handle(ex =>
+                {
+                    Console.WriteLine($"Caught exception in Brodcast: Username='{ex.Data["Username"]}' -- {ex.Message}");
+                    return true;
+                });
+
+                Console.WriteLine($"Broadcast: ClientCount={clients.Count} Elapsed={sw.Elapsed:G} (ThreadID={Thread.CurrentThread.ManagedThreadId})");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Caught exception in Broadcast: {ex.Message}");
-            }
-            
-            tasks.Exception?.Handle(ex => { 
-                Console.WriteLine($"Caught exception in Brodcast: Username='{ex.Data["Username"]}' -- {ex.Message}"); 
-                return true; 
-            });
-
-            Console.WriteLine($"ThreadID={System.Threading.Thread.CurrentThread.ManagedThreadId} Broadcast {sw.Elapsed:G}");
-        }
-
-        private async Task AddClient(ConnectedClient client)
-        {
-            try
-            {
-                await mutex.WaitAsync();
-                Console.WriteLine($"ThreadID={System.Threading.Thread.CurrentThread.ManagedThreadId} AddClient");
-                clients.Add(client);
-                var st = new Status();
-                st.AddClient = client.Username;
-                st.CurrentClients.Add(clients.Select(x => x.Username));
-                var sm = new ServerChatMessage();
-                sm.Status = st;
-                await Broadcast(sm);
+                Console.WriteLine($"!!! Caught exception in Broadcast: {ex.Message}");
             }
             finally
             {
                 mutex.Release();
+            }
+        }
+
+        private async Task AddClient(ConnectedClient client)
+        {
+            await mutex.WaitAsync();
+
+            ServerChatMessage sm = null;
+
+            try
+            {
+                clients.Add(client);
+
+                var st = new Status();
+                st.AddClient = client.Username;
+                st.CurrentClients.Add(clients.Select(c => c.Username));
+
+                sm = new ServerChatMessage();
+                sm.Status = st;
+
+                Console.WriteLine($"AddClient: {client.Username} (ThreadID={Thread.CurrentThread.ManagedThreadId})");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"!!! Caught Exception in AddClient: {ex.Message}");
+                sm = null;
+            }
+            finally
+            {
+                mutex.Release();
+            }
+
+            if (sm != null)
+            {
+                await Broadcast(sm);
             }
         }
 
         private async Task DeleteClient(ConnectedClient client)
         {
+            await mutex.WaitAsync();
+
+            ServerChatMessage sm = null;
+
             try
             {
-                await mutex.WaitAsync();
-                Console.WriteLine($"ThreadID={System.Threading.Thread.CurrentThread.ManagedThreadId} DeleteClient");
                 clients.Remove(client);
+
                 var st = new Status();
                 st.DeleteClient = client.Username;
-                st.CurrentClients.Add(clients.Select(x => x.Username));
-                var sm = new ServerChatMessage();
+                st.CurrentClients.Add(clients.Select(x => x.Username).ToList());
+
+                sm = new ServerChatMessage();
                 sm.Status = st;
 
-                await Broadcast(sm);
+                Console.WriteLine($"DeleteClient: {client.Username} (ThreadID={Thread.CurrentThread.ManagedThreadId})");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"!!! Caught Exception in DeleteClient: {ex.Message}");
+                sm = null;
             }
             finally
             {
                 mutex.Release();
             }
+
+            if (sm != null)
+            {
+                await Broadcast(sm);
+            }
         }
 
         public override async Task ChatStream(IAsyncStreamReader<ChatMessage> requestStream, IServerStreamWriter<ServerChatMessage> responseStream, ServerCallContext context)
         {
-            var responseHeaders = new Metadata();
-            responseHeaders.Add("status", "OK");
-            await context.WriteResponseHeadersAsync(responseHeaders);
-            
             string username = context.RequestHeaders.GetValue("username");
-            ClientConnected.Invoke(username);
+            var responseHeaders = new Metadata();
+
+            if (string.IsNullOrEmpty(username))
+            {
+                responseHeaders.Add("status", "Error");
+                responseHeaders.Add("message", "Username is required in request headers");
+                await context.WriteResponseHeadersAsync(responseHeaders);
+                return;
+            }
 
             var client = new ConnectedClient()
             {
@@ -133,26 +166,27 @@ namespace GrpcChatServer
                 ChatWriter = responseStream,
                 ChatContext = context,
                 Username = username,
-                Guid = new Guid()
+                Guid = Guid.NewGuid()
             };
+
+            responseHeaders.Add("status", "OK");
+            responseHeaders.Add("guid", client.Guid.ToString());
+            
+            await context.WriteResponseHeadersAsync(responseHeaders);
 
             await AddClient(client);
 
-            while (await requestStream.MoveNext())
+            try
             {
-                try
+                while (await requestStream.MoveNext())
                 {
-                    await mutex.WaitAsync();
-                    ChatMessageReceived.Invoke(requestStream.Current);
                     await Broadcast(requestStream.Current);
                 }
-                finally
-                {
-                    mutex.Release();
-                }
             }
-
-            ClientDisconnected.Invoke(username);
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Caught exception in ChatReader: {ex.Message}");
+            }
 
             await DeleteClient(client);
         }
