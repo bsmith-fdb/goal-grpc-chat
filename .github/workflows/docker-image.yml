@@ -21,4 +21,8 @@ jobs:
     - name: Build GrpcChatServer project
       run: dotnet build GrpcChatServer/GrpcChatServer.csproj
     - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag grpc-chat-server:$(date +%s)
+      run: docker build . --file Dockerfile --tag grpc-chat-server
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v2.2.4
+      with:
+        path: grpc-chat-server
