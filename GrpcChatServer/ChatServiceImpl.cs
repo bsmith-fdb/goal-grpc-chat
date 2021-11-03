@@ -4,6 +4,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using NLog;
+using NLog.Config;
+using NLog.Targets;
 
 namespace GrpcChatServer
 {
@@ -20,6 +23,23 @@ namespace GrpcChatServer
 
         private readonly HashSet<ConnectedClient> clients = new HashSet<ConnectedClient>();
         private readonly SemaphoreSlim mutex = new SemaphoreSlim(1);
+        private readonly Logger logger;
+
+        public ChatServiceImpl()
+        {
+            var config = new LoggingConfiguration();
+            var consoleTarget = new ConsoleTarget
+            {
+                Name = "console",
+                Layout = "${longdate}|${level:uppercase=true}|${message}",
+            };
+            config.AddRule(LogLevel.Debug, LogLevel.Fatal, consoleTarget, "*");
+            LogManager.Configuration = config;
+
+            logger = LogManager.GetCurrentClassLogger();
+
+            logger.Info("Server started");
+        }
 
         private async Task Broadcast(ChatMessage cm)
         {
@@ -61,15 +81,15 @@ namespace GrpcChatServer
 
                 tasks.Exception?.Handle(ex =>
                 {
-                    Console.WriteLine($"Caught exception in Brodcast: Username='{ex.Data["Username"]}' -- {ex.Message}");
+                    logger.Warn(ex, $"!!! Broadcast Exception: Username='{ex.Data["Username"]}' !!! {ex.Message}");
                     return true;
                 });
 
-                Console.WriteLine($"Broadcast: ClientCount={clients.Count} Elapsed={sw.Elapsed:G} (ThreadID={Thread.CurrentThread.ManagedThreadId})");
+                logger.Info($"Broadcast: {(sm.Message != null ? "ChatMessage" : string.Empty)} {(sm.Status != null ? "Status" : string.Empty)} ClientCount={clients.Count} Elapsed={sw.Elapsed:G}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"!!! Caught exception in Broadcast: {ex.Message}");
+                logger.Error($"!!! Broadcast Exception: {ex.Message}");
             }
             finally
             {
@@ -94,11 +114,11 @@ namespace GrpcChatServer
                 sm = new ServerChatMessage();
                 sm.Status = st;
 
-                Console.WriteLine($"AddClient: {client.Username} (ThreadID={Thread.CurrentThread.ManagedThreadId})");
+                logger.Info($"AddClient: Username='{client.Username}'");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"!!! Caught Exception in AddClient: {ex.Message}");
+                logger.Error(ex, $"!!! AddClient Exception: Username='{client.Username}' !!! {ex.Message}");
                 sm = null;
             }
             finally
@@ -129,11 +149,11 @@ namespace GrpcChatServer
                 sm = new ServerChatMessage();
                 sm.Status = st;
 
-                Console.WriteLine($"DeleteClient: {client.Username} (ThreadID={Thread.CurrentThread.ManagedThreadId})");
+                logger.Info($"DeleteClient: Username='{client.Username}'");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"!!! Caught Exception in DeleteClient: {ex.Message}");
+                logger.Error(ex, $"!!! DeleteClient Exception: Username='{client.Username}' !!! {ex.Message}");
                 sm = null;
             }
             finally
@@ -181,14 +201,16 @@ namespace GrpcChatServer
                 while (await requestStream.MoveNext())
                 {
                     await Broadcast(requestStream.Current);
+                    throw new Exception("Test exception");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Caught exception in ChatReader: {ex.Message}");
+                logger.Error($"!!! RequestStream Exception: Username='{client.Username}' !!! {ex.Message}");
             }
 
             await DeleteClient(client);
         }
+
     }
 }

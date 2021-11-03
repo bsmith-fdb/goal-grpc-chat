@@ -187,8 +187,8 @@ namespace GrpcChatClient
         private void Form1_Load(object sender, EventArgs e)
         {
             txtUsername.Text = $"{Usernames[new Random().Next(0, Usernames.Count - 1)]}";
-            //Connect(txtUsername.Text);
-            //SendSpam();
+            Connect(txtUsername.Text);
+            SendSpam();
         }
 
         private void SendSpam()

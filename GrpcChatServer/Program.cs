@@ -19,15 +19,9 @@ namespace GrpcChatServer
                 Ports = { new ServerPort(host, port, ServerCredentials.Insecure) }
             };
             svr.Start();
-            
-            Console.WriteLine($"Started server on {host}:{port}");
 
-            Console.WriteLine("Type 'quit' to exit");
-
-            while (Console.ReadLine() != "quit")
-            {
-                continue;
-            }
+            if (Console.ReadLine() == string.Empty)
+            { }
         }
     }
 }
