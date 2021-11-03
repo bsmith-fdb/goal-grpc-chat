@@ -11,9 +11,6 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
-    
-    env:
-      DockerImageName: grpc-chat-server:$(date +%s)
 
     steps:
     - uses: actions/checkout@v2
@@ -24,4 +21,4 @@ jobs:
     - name: Build GrpcChatServer project
       run: dotnet build GrpcChatServer/GrpcChatServer.csproj
     - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag $DockerImageName
+      run: docker build . --file Dockerfile --tag grpc-chat-server:$(date +%s)
