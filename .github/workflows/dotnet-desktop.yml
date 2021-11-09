@@ -2,8 +2,6 @@ name: .NET Core Desktop
 
 on:
   push:
-    tags:
-      - '*'
     paths:
       - 'GrpcChat/**'
       - 'GrpcChatClient/**'
