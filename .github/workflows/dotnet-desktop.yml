@@ -36,7 +36,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ github.run_id }}${{ github.run_attempt }}
-        release_name: Release ${{ github.run_id }}${{ github.run_attempt }}
+        release_name: GrpcChatClient ${{ github.run_id }}${{ github.run_attempt }}
         draft: false
         prerelease: false
     - name: Upload Release Asset
