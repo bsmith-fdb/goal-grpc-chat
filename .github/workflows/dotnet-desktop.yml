@@ -5,6 +5,7 @@ on:
     paths:
       - 'GrpcChat/**'
       - 'GrpcChatClient/**'
+      - '.github/workflows/dotnet-desktop.yml'
 
 jobs:
 
@@ -35,9 +36,9 @@ jobs:
       with:
         files: GrpcChatClient.zip
 
-#    - name: Upload build artifacts
-#      uses: actions/upload-artifact@v2
-#      with:
-#        name: GrpcChatClient
-#        path: GrpcChatClient/bin/Debug/net5.0-windows
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: GrpcChatClient
+        path: GrpcChatClient/bin/Debug/net5.0-windows
     
