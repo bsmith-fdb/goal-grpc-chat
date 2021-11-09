@@ -2,9 +2,9 @@ name: .NET Core Desktop
 
 on:
   push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+    paths:
+      - 'GrpcChat/**'
+      - 'GrpcChatClient/**'
 
 jobs:
 
@@ -23,11 +23,21 @@ jobs:
       uses: actions/setup-dotnet@v1
       with:
         dotnet-version: 5.0.x
+    
     - run: dotnet build GrpcChatClient/GrpcChatClient.csproj
-
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v2
+    
+    - uses: montudor/action-zip@v1.0.0
       with:
-        name: GrpcChatClient
-        path: GrpcChatClient/bin/Debug/net5.0-windows
+        args: zip -qq -r GrpcChatClient.zip GrpcChatClient/bin/Debug/net5.0-windows
+        
+    - uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: GrpcChatClient.zip
+
+#    - name: Upload build artifacts
+#      uses: actions/upload-artifact@v2
+#      with:
+#        name: GrpcChatClient
+#        path: GrpcChatClient/bin/Debug/net5.0-windows
     
