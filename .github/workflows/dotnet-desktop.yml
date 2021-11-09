@@ -28,15 +28,36 @@ jobs:
     - run: dotnet build GrpcChatClient/GrpcChatClient.csproj
     
     - run: Compress-Archive -DestinationPath GrpcChatClient.zip -Path GrpcChatClient/bin/Debug/net5.0-windows/*
-        
-    - uses: softprops/action-gh-release@v1
-      if: startsWith(github.ref, 'refs/tags/')
-      with:
-        files: GrpcChatClient.zip
 
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v2
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        name: GrpcChatClient
-        path: GrpcChatClient/bin/Debug/net5.0-windows
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false
+    - name: Upload Release Asset
+      id: upload-release-asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./GrpcChatClient.zip
+        asset_name: GrpcChatClient.zip
+        asset_content_type: application/zip
+        
+#    - uses: softprops/action-gh-release@v1
+#      if: startsWith(github.ref, 'refs/tags/')
+#      with:
+#        files: GrpcChatClient.zip
+
+#    - name: Upload build artifacts
+#      uses: actions/upload-artifact@v2
+#      with:
+#        name: GrpcChatClient
+#        path: GrpcChatClient/bin/Debug/net5.0-windows
     
