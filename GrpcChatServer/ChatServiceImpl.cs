@@ -38,7 +38,7 @@ namespace GrpcChatServer
 
             logger = LogManager.GetCurrentClassLogger();
 
-            logger.Info("Server started");
+            logger.Info($"Started {typeof(ChatServiceImpl).Assembly.GetName().FullName}");
         }
 
         private async Task Broadcast(ChatMessage cm)
@@ -56,6 +56,8 @@ namespace GrpcChatServer
             await mutex.WaitAsync();
 
             var sw = System.Diagnostics.Stopwatch.StartNew();
+
+            Task tasks = null;
 
             try
             {
@@ -75,21 +77,23 @@ namespace GrpcChatServer
                         }
                     }));
 
-                var tasks = Task.WhenAll(taskList);
+                tasks = Task.WhenAll(taskList);
 
                 await tasks;
 
-                tasks.Exception?.Handle(ex =>
-                {
-                    logger.Warn(ex, $"!!! Broadcast Exception: Username='{ex.Data["Username"]}' !!! {ex.Message}");
-                    return true;
-                });
+                
 
                 logger.Info($"Broadcast: {(sm.Message != null ? "ChatMessage" : string.Empty)} {(sm.Status != null ? "Status" : string.Empty)} ClientCount={clients.Count} Elapsed={sw.Elapsed:G}");
             }
             catch (Exception ex)
             {
                 logger.Error($"!!! Broadcast Exception: {ex.Message}");
+
+                tasks?.Exception?.Handle(ex =>
+                {
+                    logger.Error(ex, $"!!! Broadcast Exception: Username='{ex.Data["Username"]}' !!! {ex.Message}");
+                    return true;
+                });
             }
             finally
             {

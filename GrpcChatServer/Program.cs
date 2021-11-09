@@ -18,6 +18,7 @@ namespace GrpcChatServer
                 Services = { ChatService.BindService(svc) },
                 Ports = { new ServerPort(host, port, ServerCredentials.Insecure) }
             };
+
             svr.Start();
 
             while (Console.ReadLine() != "quit")

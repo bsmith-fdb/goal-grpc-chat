@@ -108,7 +108,15 @@ namespace GrpcChatClient
         {
             Debug.Print($"Client Connect: Username='{username}' Host='{host}' Port='{port}'");
 
-            channel = new Channel($"{host}:{port}", ChannelCredentials.Insecure);
+            var channelOptions = new List<ChannelOption> { 
+                new ChannelOption("GRPC_ARG_KEEPALIVE_TIME_MS", 60 * 1000),
+                new ChannelOption("GRPC_ARG_KEEPALIVE_TIMEOUT_MS", 5 * 1000),
+                new ChannelOption("GRPC_ARG_HTTP2_MAX_PINGS_WITHOUT_DATA", 0),
+                new ChannelOption("GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS", 1)
+            };
+
+            channel = new Channel($"{host}:{port}", ChannelCredentials.Insecure, channelOptions);
+            
             client = new ChatService.ChatServiceClient(channel);
 
             var headers = new Metadata();
