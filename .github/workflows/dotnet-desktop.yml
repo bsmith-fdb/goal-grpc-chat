@@ -35,8 +35,8 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
+        tag_name: ${{ github.run-id }}-${{ github.run_attempt }}
+        release_name: Release ${{ github.run-id }}-${{ github.run_attempt }}
         draft: false
         prerelease: false
     - name: Upload Release Asset
@@ -49,15 +49,3 @@ jobs:
         asset_path: ./GrpcChatClient.zip
         asset_name: GrpcChatClient.zip
         asset_content_type: application/zip
-        
-#    - uses: softprops/action-gh-release@v1
-#      if: startsWith(github.ref, 'refs/tags/')
-#      with:
-#        files: GrpcChatClient.zip
-
-#    - name: Upload build artifacts
-#      uses: actions/upload-artifact@v2
-#      with:
-#        name: GrpcChatClient
-#        path: GrpcChatClient/bin/Debug/net5.0-windows
-    
